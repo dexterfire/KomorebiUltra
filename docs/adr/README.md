@@ -12,6 +12,7 @@ sharing raw conversation text.
 | 0003 | [Federated LoRA upload](0003-federated-lora-upload.md)                | Proposed    |
 | 0004 | [Aggregation & release pipeline](0004-aggregation-release-pipeline.md)| Proposed    |
 | 0005 | [Transparency log & revocation](0005-transparency-log-revocation.md)  | Proposed    |
+| 0006 | [Always-on listening without Self-echo](0006-always-on-listening-self-echo.md) | Accepted |
 
 ## Conventions
 
