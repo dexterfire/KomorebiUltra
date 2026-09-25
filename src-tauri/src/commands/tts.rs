@@ -158,6 +158,14 @@ pub async fn synthesize_via_provider(
     app: &AppHandle<Wry>,
     text: &str,
 ) -> Result<Option<Vec<u8>>, String> {
+    // Every TTS entry point (chat replies, avatar reactions, speak_text)
+    // funnels through here, so strip symbols once. Cloud voices like Edge
+    // read `~`, `*`, `^` aloud even though the chat bubble hides them.
+    let clean = crate::chat::speak::sanitize_for_tts(text);
+    if clean.is_empty() {
+        return Ok(None);
+    }
+    let text = clean.as_str();
     let provider = settings::get_tts_provider(app);
     match provider.as_str() {
         "openrouter" => {

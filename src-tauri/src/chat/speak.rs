@@ -29,7 +29,7 @@ pub(super) async fn maybe_speak(app: &AppHandle<Wry>, text: String) {
 /// Strip markdown/code fences and other symbols Piper mispronounces as
 /// clicks, buzzes, or garbled phonemes. Keeps letters, digits, basic
 /// punctuation, and common Unicode letters (Cyrillic, etc.).
-fn sanitize_for_tts(text: &str) -> String {
+pub(crate) fn sanitize_for_tts(text: &str) -> String {
     // First: drop any <mood:X> tags so they aren't pronounced as
     // "less-than mood colon happy greater-than".
     let stripped = strip_mood_tags(text);
@@ -132,6 +132,22 @@ fn strip_inline_tag_block(text: &str, name: &str) -> String {
     }
     out.push_str(rest);
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize_for_tts;
+
+    #[test]
+    fn strips_kaomoji_symbols_from_reaction_lines() {
+        assert_eq!(sanitize_for_tts("Эй~ щекотно~ ^_^ ♪"), "Эй щекотно");
+        assert_eq!(sanitize_for_tts("*хихикает* Привет!~"), "хихикает Привет!");
+    }
+
+    #[test]
+    fn symbol_only_text_becomes_empty() {
+        assert_eq!(sanitize_for_tts("~ ^_^ ~"), "");
+    }
 }
 
 #[inline]

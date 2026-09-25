@@ -26,7 +26,7 @@ mod prompts;
 mod rag;
 mod runner;
 mod skill_picker;
-mod speak;
+pub(crate) mod speak;
 mod tool_loop;
 mod vision;
 
