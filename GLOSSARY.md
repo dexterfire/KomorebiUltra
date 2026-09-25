@@ -26,6 +26,10 @@ _Avoid_: comment, noise
 User speech during the companion's reply that corrects its direction; the companion winds down the current phrase and continues with a changed answer instead of starting over.
 _Avoid_: correction, redirect
 
+**Self-echo**:
+The companion's own voice picked up by the microphone and recognized as user speech; it must never become a Turn, Barge-in, or Aside.
+_Avoid_: feedback, noise
+
 **Pending utterances**:
 Utterances the user produced while the companion was thinking or speaking and that have not been answered yet; they are merged into one Turn rather than answered one by one.
 _Avoid_: queue of messages
