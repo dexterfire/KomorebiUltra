@@ -25,11 +25,21 @@ fn triggers(query: &str) -> bool {
     let q = norm(query);
     // RU
     q.contains("скриншот") || q.contains("скрин") || q.contains("снимок экрана") || q.contains("снимок рабочего стола")
+    || q.contains("сними экран") || ru_capture_verb_with_screen(&q)
     // EN
     || q.contains("screenshot") || q.contains("screen shot") || q.contains("screen capture")
-    || q.contains("capture screen") || q.contains("take screen") || q.contains("print screen") || q.contains("prtsc")
+    || q.contains("capture screen") || q.contains("capture my screen") || q.contains("screen grab") || q.contains("take screen") || q.contains("print screen") || q.contains("prtsc")
     // UK
     || q.contains("знімок екран") || q.contains("скріншот") || q.contains("скрін") || q.contains("зніми екран")
+}
+
+/// RU paraphrases ("сними мой экран", "сфотографируй рабочий стол",
+/// "захват экрана"): a capture verb anywhere plus the screen/desktop noun.
+/// A bare noun ("Экран.", "на экране") is STT noise, not a command.
+fn ru_capture_verb_with_screen(q: &str) -> bool {
+    const VERBS: &[&str] = &["сними", "снимите", "снимок", "сфоткай", "сфотографируй", "захват", "запечатлей"];
+    let has_object = q.contains("экран") || (q.contains("рабоч") && q.contains("стол"));
+    has_object && q.split(|c: char| !c.is_alphanumeric()).any(|w| VERBS.iter().any(|v| w.starts_with(v)))
 }
 
 fn output_dir() -> PathBuf {
@@ -108,7 +118,12 @@ impl Skill for ScreenshotSkill {
         triggers(query)
     }
 
-    async fn execute(&self, _ctx: SkillContext) -> Result<SkillResponse, SkillError> {
+    async fn execute(&self, ctx: SkillContext) -> Result<SkillResponse, SkillError> {
+        // Same guard as the other skills: a classifier may pick us for a
+        // query that isn't a screenshot request (STT noise like "Экран.").
+        if !triggers(&ctx.query) {
+            return Err(SkillError::NotApplicable);
+        }
         tokio::task::spawn_blocking(|| -> Result<SkillResponse, SkillError> {
             let dir = output_dir();
             std::fs::create_dir_all(&dir)
@@ -135,5 +150,76 @@ mod tests {
         assert!(triggers("take a screenshot"));
         assert!(triggers("снимок экрана"));
         assert!(!triggers("привет"));
+    }
+
+    /// Every screenshot anchor of the embedding classifier
+    /// (`komorebi-intent`) must pass the keyword gate, otherwise the
+    /// fast path returns `NotApplicable` for a genuine command.
+    #[test]
+    fn matches_intent_anchor_phrases() {
+        for q in [
+            "сделай скриншот",
+            "сними экран",
+            "снимок экрана",
+            "скрин",
+            "take a screenshot",
+            "capture my screen",
+            "screen grab please",
+            "зроби скріншот",
+            "знімок екрана",
+        ] {
+            assert!(triggers(q), "{q}");
+        }
+    }
+
+    /// Russian paraphrases: capture verb + "экран"/"рабочий стол" in any
+    /// word order, so a rephrased command from a classifier still passes.
+    #[test]
+    fn matches_russian_paraphrases() {
+        for q in [
+            "сними мой экран",
+            "сними весь экран",
+            "снимок с экрана",
+            "сфоткай экран",
+            "сфотографируй рабочий стол",
+            "захвати экран",
+            "захват экрана",
+            "запечатлей экран",
+            "экран сними пожалуйста",
+            "заскринь",
+            "принтскрин",
+        ] {
+            assert!(triggers(q), "{q}");
+        }
+        for q in [
+            "у меня сломался экран",
+            "убавь яркость экрана",
+            "выключи экран",
+            "что на рабочем столе",
+            "сними с паузы",
+        ] {
+            assert!(!triggers(q), "{q}");
+        }
+    }
+
+    /// Issue #1: the skill picker (embedding classifier) chose
+    /// `screenshot` for STT noise / chatter; execute must refuse instead
+    /// of capturing and replying "Saved screenshot to …".
+    #[tokio::test]
+    async fn execute_refuses_non_screenshot_queries() {
+        for q in [
+            "Экран.",
+            "Клик.",
+            "На экране",
+            "Я смотрел на экран",
+            "Что на экране?",
+            "[BLANK_AUDIO]",
+            "Субтитри зроблені",
+        ] {
+            let res = ScreenshotSkill
+                .execute(SkillContext { query: q.into() })
+                .await;
+            assert!(matches!(res, Err(SkillError::NotApplicable)), "{q}: {res:?}");
+        }
     }
 }
